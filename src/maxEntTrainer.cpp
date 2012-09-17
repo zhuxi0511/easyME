@@ -20,6 +20,9 @@ MaxEntTrainer::MaxEntTrainer(DataManager & _modelInfo, size_t _iter,
         : mModelInfo(_modelInfo), mIter(_iter), mEps(_tol), mSigma2(_sigma2), mAlpha(_alpha)
 {
     _initTrainer();
+/*
+	mModelInfo.getSourceExpected();
+	*/
 }
 
 void MaxEntTrainer::_initTrainer(void)

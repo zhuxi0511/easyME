@@ -45,6 +45,7 @@ public:
     inline void addFeature(size_t classId, size_t fetId, double weight = 0.0);
     void endAddFeature();
    	void clearParam();
+	void clearEvent();
 public:
     inline size_t getEventNum();
     inline size_t getFetNum();
@@ -64,6 +65,10 @@ public:
     inline size_t getEventCount(size_t eventId);
     inline size_t getEventClassId(size_t evenId);
 public:
+	vector<vector<double > > sourceExpected;
+	vector<vector<double > > targetExpected;
+	void getSourceExpected();
+	void getTargetExpected();
 	void getObserves(std::vector<std::vector<double> > & observed);
     double getExpects(std::vector<std::vector<double> > & expects);
     size_t getAllProbs(const context_iterator begin, const context_iterator end, std::vector<double> & probs);

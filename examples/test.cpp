@@ -58,10 +58,11 @@ int main(int argc, char * argv[])
     MaxEntModel * me = new MaxEntModel;
     // get load file and map times consumed
     int stime = clock();
-    me->loadModel(argv[1]);
+    me->loadModel(argv[1], argv[2], argv[3]);
     int ttime = clock();
     cout << "file load and string map consumes: " << (double)(ttime - stime) / CLOCKS_PER_SEC << "s" << endl;
-    testModel(me, argv[2]);
+    //testModel(me, argv[2]);
+	me->testModel();
     ttime = clock();
     delete me;
 	return 0;

@@ -60,7 +60,7 @@ public:
     *@param  name of file to load the model
     *@return 1 to success, 0 to fail
     */
-    bool loadModel(const char *modelFileName = "MAXENT.model");
+    bool loadModel(const char *modelFileName = "MAXENT.model", const char *trainFileName, const char * targetFileName);
    /**
     *@brief  classify a given context to a most probable class
     *@param  className : the predicted. The value of this parameter
@@ -83,6 +83,8 @@ public:
     */
     size_t predict(const std::vector<std::string> & context,
                    std::vector<std::pair<std::string, double> > & outcome);
+
+	void testModel();
 
 private:
     DataManager mModelInfo;

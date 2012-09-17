@@ -27,6 +27,11 @@ DataManager::DataManager()
 {
 	mParamSet.resize(1);
 }
+void DataManager::clearEvent()
+{
+	mEventSet.clear();
+	mEventSet.resize(0);
+}
 
 void DataManager::clearParam()
 {
@@ -66,6 +71,38 @@ size_t DataManager::getAllProbs(
                 it != pend; ++it){
             size_t cid = it->first;
             probs[cid] += it->second;
+        }
+    }
+    size_t maxK = 0;
+    double sum = 0;
+    for(size_t i = 1; i <= mMaxCid; i++){
+        probs[i] = exp(probs[i]);
+        sum += probs[i];
+        if(probs[i] > probs[maxK])
+            maxK = i;
+    }
+    for(size_t i = 1; i <= mMaxCid; ++i)
+        probs[i] /= sum;
+    return maxK;
+}
+
+
+size_t DataManager::getAllProbsNew(
+        const context_iterator begin,
+        const context_iterator end,
+        vector<double> & probs)
+{
+    probs.clear();
+    probs.resize(mMaxCid + 1, 0);
+    for(context_iterator cit = begin; cit != end; ++cit){
+        size_t fid = *cit;
+        for(param_iterator it = getParamBegin(fid),
+                pend = getParamEnd(fid);
+                it != pend; ++it){
+            size_t cid = it->first;
+			int pos = it - getParamBegin(fid);
+			double featureAdjust = targetExpected[fid][pos] / sourceExpected[fid][pos];
+            probs[cid] += it->second * featureAdjust;
         }
     }
     size_t maxK = 0;
@@ -121,20 +158,20 @@ double DataManager::getExpects(vector<vector<double> > & expected)
 {
     vector<double> probs;
     expected.clear();
-    expected.resize(mParamSet.size());
+    expected.resize(mParamSet.size()); //the mParamSet is the vecotr<vector<pair> > which saves every feature to every his class's weight, the init is 0;
     for(size_t i = 0; i < mParamSet.size(); ++i)
         expected[i].resize(mParamSet[i].size(), 0);
     double logLike = 0;
-    for(size_t i = 0, eventNum = getEventNum(); i < eventNum; ++i){
-        context_iterator ctxtBegin = getContextBegin(i);
-        context_iterator ctxtEnd = getContextEnd(i);
-        getAllProbs(ctxtBegin, ctxtEnd, probs);
-        size_t count = getEventCount(i);
-        size_t classId = getEventClassId(i);
-        vector<double> newProbs;
-        for(size_t i = 0; i < probs.size(); ++i)
-        	newProbs.push_back(probs[i] * count);
-        for(context_iterator it = ctxtBegin; it != ctxtEnd; ++it){
+	for(size_t i = 0, eventNum = getEventNum(); i < eventNum; ++i){
+		context_iterator ctxtBegin = getContextBegin(i);
+		context_iterator ctxtEnd = getContextEnd(i);
+		getAllProbs(ctxtBegin, ctxtEnd, probs);
+		size_t count = getEventCount(i);
+		size_t classId = getEventClassId(i);
+		vector<double> newProbs;
+		for(size_t i = 0; i < probs.size(); ++i)
+			newProbs.push_back(probs[i] * count);
+		for(context_iterator it = ctxtBegin; it != ctxtEnd; ++it){
 			size_t fid = *it;
 			param_iterator pBegin = getParamBegin(fid);
 			param_iterator pEnd = getParamEnd(fid);
@@ -145,80 +182,159 @@ double DataManager::getExpects(vector<vector<double> > & expected)
 			}
 		}
 		logLike += log(probs[classId]) * count;
-    }
-   return logLike;
+	}
+	return logLike;
 }
 
 bool mePairEqual(const pair<size_t, double> & a, const pair<size_t, double> & b)
 {
-    return a.first == b.first;
+	return a.first == b.first;
 }
 void DataManager::endAddFeature()
 {
 	mFfCnt = 0;
-    for(size_t i = 0; i < mParamSet.size(); ++i){
-        sort(mParamSet[i].begin(), mParamSet[i].end());
-        size_t size = unique(mParamSet[i].begin(), mParamSet[i].end(), mePairEqual) - mParamSet[i].begin();
-        mParamSet[i].resize(size);
-        mFfCnt += size;
-    }
+	for(size_t i = 0; i < mParamSet.size(); ++i){
+		sort(mParamSet[i].begin(), mParamSet[i].end());
+		size_t size = unique(mParamSet[i].begin(), mParamSet[i].end(), mePairEqual) - mParamSet[i].begin();
+		mParamSet[i].resize(size);
+		mFfCnt += size;
+	}
 
 #if DEBUG
-    ofstream fout("param.out");
-    for(size_t i = 0; i < mParamSet.size(); i++){
-        for(size_t j = 0; j < mParamSet[i].size(); j++)
-            fout << mParamSet[i][j].second << " ";
-        fout << endl;
-    }
+	ofstream fout("param.out");
+	for(size_t i = 0; i < mParamSet.size(); i++){
+		for(size_t j = 0; j < mParamSet[i].size(); j++)
+			fout << mParamSet[i][j].second << " ";
+		fout << endl;
+	}
 #endif
 }
 
 void DataManager::getAllFeatures()
 {
-    size_t eventNum = getEventNum();
-    for(size_t i = 0; i < eventNum; ++i){
-        int cid = getEventClassId(i);
-        for(context_iterator it = getContextBegin(i),
-                end = getContextEnd(i);
-                it != end; ++it){
-            int fid = *it;
-            addFeature(cid, fid);
-        }
-    }
-    endAddFeature();
+	size_t eventNum = getEventNum();
+	for(size_t i = 0; i < eventNum; ++i){
+		int cid = getEventClassId(i);
+		for(context_iterator it = getContextBegin(i),
+				end = getContextEnd(i);
+				it != end; ++it){
+			int fid = *it;
+			addFeature(cid, fid);
+		}
+	}
+	endAddFeature();
 
 #if DEBUG
-    ofstream fout("map.out");
-    for(size_t i = 0; i < eventNum; ++i){
-        size_t cid = getEventClassId(i);
-        size_t count = getEventCount(i);
-        fout << count << " " << cid;
-        sort(mEventSet[i].context.begin(), mEventSet[i].context.end());
-        for(context_iterator it = getContextBegin(i),
-                end = getContextEnd(i);
-                it != end; ++it){
-            int fid = *it;
-            fout << " " << fid;
-        }
-        fout << endl;
-    }
+	ofstream fout("map.out");
+	for(size_t i = 0; i < eventNum; ++i){
+		size_t cid = getEventClassId(i);
+		size_t count = getEventCount(i);
+		fout << count << " " << cid;
+		sort(mEventSet[i].context.begin(), mEventSet[i].context.end());
+		for(context_iterator it = getContextBegin(i),
+				end = getContextEnd(i);
+				it != end; ++it){
+			int fid = *it;
+			fout << " " << fid;
+		}
+		fout << endl;
+	}
 #endif
 }
 
 void DataManager::processEventSet()
 {
-    sort(mEventSet.begin(), mEventSet.end());
-    vector<Event> newEventSet;
-    mEventSet.push_back(Event(0, 0, vector<size_t>()));
-    for(size_t i = 0, cnt = 0; i < mEventSet.size() - 1; ++i){
-        if(mEventSet[i] == mEventSet[i+1])
-            cnt += mEventSet[i].count;
-        else{
-            mEventSet[i].count += cnt;
-            newEventSet.push_back(mEventSet[i]);
-            cnt = 0;
-        }
-    }
-    mEventSet = newEventSet;
+	sort(mEventSet.begin(), mEventSet.end());
+	vector<Event> newEventSet;
+	mEventSet.push_back(Event(0, 0, vector<size_t>()));
+	for(size_t i = 0, cnt = 0; i < mEventSet.size() - 1; ++i){
+		if(mEventSet[i] == mEventSet[i+1])
+			cnt += mEventSet[i].count;
+		else{
+			mEventSet[i].count += cnt;
+			newEventSet.push_back(mEventSet[i]);
+			cnt = 0;
+		}
+	}
+	mEventSet = newEventSet;
 }
 
+void DataManager::getSourceExpected()
+{
+
+	//must load the mParamSet first;
+	sourceExpected.clear();
+	sourceExpected.resize(mParamSet.size());
+	for (size_t i = 0; i < mParamSet.size(); ++i)
+		sourceExpected[i].resize(mParamSet[i].size(), 0);
+
+	size_t featureCount = getFeatureCount();
+	size_t sumN = 0;
+	for(size_t i = 0, eventNum = getEventCount(); i < eventNum; ++i)
+	{
+		context_iterator ctxtBegin = getContextBegin(i);
+		context_iterator ctxtEnd = getContextEnd(i);
+
+		size_t classId = getEventClassId(i);
+
+		for (context_iterator it = ctxtBegin; it != ctxtEnd; ++it)
+		{
+			size_t fid = *it;
+
+			int pos = getClassPosition(classId, fid);
+			sourceExpected[fid][pos] += 1;
+			sumN++;
+		}
+	}
+	size_t mMaxFid = mModelInfo.getFetNum();
+	for (size_t i = 0; i < mMaxFid; ++i)
+	{
+		for (int j = 0; j < sourceExpected[i].size(); ++j)
+		{
+			sourceExpected[i][j] /= (double)sumN;
+		}
+	}
+}
+
+void DataManager::getTargetExpected()
+{
+	targetExpected.clear();
+	targetExpected.resize(mParamSet.size());
+	for (size_t i = 0; i < mParamSet.size(); ++i)
+		targetExpected[i].resize(mParamSet[i].size(), 0);
+
+	vector<double> probs;
+
+	size_t sumN = 0;
+	for (size_t i = 0, eventNum = getEventCount(); i < eventNum; ++i)
+	{
+		context_iterator ctxtBegin = getContextBegin(i);
+		context_iterator ctxtEnd = getContextEnd(i);
+
+		getAllProbs(ctxtBegin, ctxtEnd, probs);
+
+		sumN += mEventSet[i].size();
+
+		for (context_iterator it = ctxtBegin; it != end; ++it)
+		{
+			size_t fid = *it;
+
+			param_iterator pBegin = getParamBegin(fid);
+			param_iterator pEnd = getParamEnd(fid);
+			for(param_iterator pit = getParamBegin(fid); pit != pEnd; ++pit)
+			{
+				int pos = pit - pBegin;
+				size_t cid = pit->first;
+				targetExpected[fid][pos] += probs[cid];
+			}
+		}
+	}
+	size_t mMaxFid = mModelInfo.getFetNum();
+	for(size_t i = 0; i < mMaxFid; ++i)
+	{
+		for (int j = 0; j < targetExpected[i].size(); ++j)
+		{
+			targetExpected[i][j] /= (double)sumN;
+		}
+	}
+}

@@ -97,8 +97,9 @@ bool MaxEntModel::trainModel(
     return true;
 }
 
-bool MaxEntModel::loadModel(const char * modelFileName)
+bool MaxEntModel::loadModel(const char * modelFileName, const char * trianFileName, const char * targetFileName )
 {
+
     ifstream fin(modelFileName);
     if(!fin){
         cerr << "open model file failed!" << endl;
@@ -125,10 +126,69 @@ bool MaxEntModel::loadModel(const char * modelFileName)
         }
     }
     mModelInfo.endAddFeature();
+
+	fin.close();
+
     cout << "model loaded ok!" << endl;
     cout << "num of fets: " << mModelInfo.getFetNum() << endl;
     cout << "num of classes: " << mModelInfo.getClassNum() << endl;
     cout << "tot feature count is: " << mModelInfo.getFeatureCount() << endl;
+
+	cout << endl << "begin load the train file..." << endl;
+    fin.open(trainFileName);
+    if(!fin){
+        cerr << "train file not exit!" << endl;
+        exit(-1);
+    }
+    string line, str;
+    vector<size_t> context;
+    size_t count = 1;
+    // each line is a event, it looks like this:
+    // (count) className fetName ... fetName
+    while(getline(fin, line)){
+        istringstream sin(line);
+        // with freq ?
+        //if(freq) sin >> count;
+        sin >> str;
+        size_t classId = mClassMap.insertString(str);
+        context.clear();
+        while(sin >> str){
+            size_t fetId = mFetMap.insertString(str);
+            context.push_back(fetId);
+        }
+        mModelInfo.addEvent(count, classId, context);
+    }
+    //mModelInfo.processEventSet();
+	mModelInfo.getSourceExpected();
+
+	fin.close();
+	cout << "finish load the train file..." << endl;
+
+	fin.open(targetFileName);
+	if (!fin)
+	{
+		cerr << "target file not exit!" << endl;
+		exit(-1);
+	}
+	mModelInfo.clearEvent();
+
+	while(getline(fin, line))
+	{
+		istringstream sin(line);
+		sin >> str;
+		size_t classId = mClassMap.str2num(str);
+		context.clear();
+		while(sin >> str)
+		{
+			size_t fetId = mFetMap.str2num(str);
+			context.push_back(fetId);
+		}
+		mModelInfo.addEvent(count, classId, context);
+	}
+
+	mModelInfo.getTargetExpected();
+
+	fin.close();
     return true;
 }
 
@@ -149,6 +209,7 @@ bool MaxEntModel::saveModel(const char * modelFileName)
         ostringstream sout;
         sout << fetName;
         bool empty = 1;
+		DataManager::param_iterator Pbegin = mModelInfo.getParamBegin();
         for(DataManager::param_iterator it = mModelInfo.getParamBegin(fid),
                 end = mModelInfo.getParamEnd(fid);
                 it != end; ++it){
@@ -158,6 +219,8 @@ bool MaxEntModel::saveModel(const char * modelFileName)
             mClassMap.num2str(it->first, className);
             sout << " " << className;
             sout << " " << it->second;
+			//sout << " " << mModelInfo.sourceExpected[fid][ it - Pbegin ];
+
         }
         if(!empty) fout << sout.str() << endl;
     }
@@ -220,4 +283,22 @@ size_t MaxEntModel::predict(const vector<string> & context, vector<pair<string, 
     	outcome.push_back(make_pair(className[i], probs[i]));
 
     return best;
+}
+
+void MaxEntModel::testModel()
+{
+	int tot = 0, corr = 0;
+	vector <double > probs;
+
+	int eventNum = mModelInfo.getEventNum();
+	for(int i = 0; i < eventNum; ++i)
+	{
+		size_t best = mModelInfo.getAllProbsNew(mModelInfo.getContextBegin(i),
+				mModelInfo.getContextEnd(i), probs);
+
+		if (best == mModelInfo.getEventClassId) corr++;
+		tot++;
+	}
+
+	cout << "test ok and corr is: " << (double )corr / tot << endl;
 }

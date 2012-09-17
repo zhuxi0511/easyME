@@ -38,6 +38,10 @@ double GisTrainer::_getSlowFactor()
             if(mModelInfo.getClassPosition(cid, *it) != -1)
                 tmpF += 1;
         }
+
+#if DEBUG
+		printf("tmpF:%lf\n" tmpF);
+#endif
         if(tmpF > mSlowF)
             mSlowF = tmpF;
     }
